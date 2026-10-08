@@ -102,10 +102,12 @@ local function CreateRow(index)
     row:SetSize(ROW_W, ROW_H)
     row:SetPoint("TOPLEFT", 0, -(index - 1) * ROW_H)
 
-    -- 图标做成可悬停按钮：鼠标移上显示技能提示
+    -- 图标做成可悬停按钮：鼠标移上显示技能提示。
+    -- ⚠️ 垂直对齐：与下方 durDd（BOTTOMLEFT, y=4, 高 24 → 中心线 y=16）同一中心，
+    --    图标高 20 → 底边 y=6；名字锚在图标 RIGHT（垂直居中跟随），状态文字锚在名字 RIGHT。
     row.icon = CreateFrame("Button", nil, row)
     row.icon:SetSize(20, 20)
-    row.icon:SetPoint("TOPLEFT", 6, -4)
+    row.icon:SetPoint("BOTTOMLEFT", 6, 6)
     row.icon.tex = row.icon:CreateTexture(nil, "ARTWORK")
     row.icon.tex:SetAllPoints()
     row.icon:SetScript("OnEnter", function(self)
@@ -185,12 +187,17 @@ function CG.RefreshPanel()
     if not panel or refreshing then return end
     refreshing = true
 
-    -- 当前专精名
+    -- 当前专精名（⚠️ GetSpecializationInfo 第 1 个返回值是 specID，名字是第 2 个；
+    -- 直接取第 2 个返回值，否则会显示成 253 这类数字）
     local specName = L("SPEC_UNKNOWN")
     local idx = GetSpecialization()
     if idx and idx > 0 then
-        local ok, name = pcall(GetSpecializationInfo, idx)
-        if ok and name then specName = name end
+        local ok, id, name = pcall(GetSpecializationInfo, idx)
+        if ok and name and name ~= "" then
+            specName = name
+        elseif ok and id then
+            specName = tostring(id)
+        end
     end
     panel.specText:SetText(L("SPEC_LABEL") .. ": " .. specName)
 
@@ -270,7 +277,7 @@ local function BuildPanel()
 
     panel.desc = panel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     panel.desc:SetPoint("TOPLEFT", panel.specText, "BOTTOMLEFT", 0, -8)
-    panel.desc:SetWidth(PANEL_W - 32)
+    panel.desc:SetWidth(PANEL_W - 48)
     panel.desc:SetJustifyH("LEFT")
     panel.desc:SetText(L("PAGE_DESC"))
 
