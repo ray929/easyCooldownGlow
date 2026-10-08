@@ -1,7 +1,5 @@
 ## Interface: 120100, 16001
 ## Title: Easy Cooldown Glow
-## Title-zhCN: CDM 动作条冷却发光
-## Title-zhTW: CDM 快捷列冷卻發光
 ## Notes: Glow the action bar buttons of spells enabled in Blizzard's Cooldown Manager (Essential) when their cooldown finishes, with configurable glow duration (none / 1-5 sec / persistent).
 ## Notes-zhCN: 暴雪冷却管理器(CDM)主冷却分组中已启用的技能，冷却完成后在对应动作条按钮上发光提醒；发光时长可配置（无/1-5秒/持续）。
 ## Notes-zhTW: 暴雪冷卻管理器(CDM)主冷卻分組中已啟用的技能，冷卻完成後在對應快捷列按鈕上發光提醒；發光時長可設定（無/1-5秒/持續）。
