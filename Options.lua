@@ -1,41 +1,44 @@
 -- Options.lua
 -- Easy Cooldown Glow — 设置界面
 --
--- 单一设置页，集成进暴雪自带的插件设置（ESC → 选项 → 插件 → 本插件）。
---   · 无 slash 命令；战斗中禁止修改（控件禁用 + 顶部红色提示）。
---   · 顶部全局「启用」开关 + 当前专精提示。
---   · 每行 = CDM「主冷却」分组里一个已启用的技能：设置其冷却完成后的发光档位
---     （持续 / 1-5 秒 / 无），按当前专精保存。
---   · 修改即时落盘（canvas layout 的 OnCommit 为空实现）。
+-- 界面分两块（对齐 easyButtonAuraByCDM 的既定模式，用户 2026-10-08 指定）：
+--   1. 暴雪插件设置里的【占位页】：只有一句提示 + 一个按钮，点按钮打开自有配置窗口。
+--   2. 【自有配置窗口】：承载全局开关 + 逐技能发光档位；用 /ecg 或占位页按钮打开；
+--      窗口顶部同样有一句提示。
+--
+-- 战斗行为（用户指定）：战斗中配置窗口直接隐藏，战斗结束若此前是打开状态则自动恢复；
+-- 战斗中不响应 /ecg 与占位页按钮（窗口无法被打开）。
 --
 -- 布局约定：所有控件的坐标都是【相对 row 的绝对坐标】，不互相链式锚定，
--- 保证行与行、控件与控件严格对齐且不重叠（对齐 easyButtonAuraByCDM 的既定做法）。
+-- 保证行与行、控件与控件严格对齐且不重叠。
+--
+-- 列表区为【固定高度 + 滚动条】：可见 VISIBLE_ROWS 行，行数超出即出现暴雪原生滚动条
+-- （支持鼠标滚轮），窗口高度不随行数增长。
 
 local CG = EasyCooldownGlow
 local L = CG.L
 
--- 面板宽度：设置 canvas 可视宽度有限，过宽会把右侧控件裁掉
-local PANEL_W = 520
-local ROW_W   = PANEL_W - 16
+-- 配置窗口宽度（对齐 easyButtonAuraByCDM 的 680）
+local PANEL_W = 680
+local ROW_W   = PANEL_W - 44
 local ROW_H   = 40
+
+-- 列表区固定高度（可见行数），行数超过即出现滚动条，窗口高度不再随行数增长
+local VISIBLE_ROWS = 10
+local LIST_H = VISIBLE_ROWS * ROW_H
 
 -- 行内第二行控件的横坐标（相对 row 左侧）与宽度
 local X_DUR, W_DUR = 150, 110
 
-local panel
+-- 暴雪设置分类名 / 配置窗口标题：不本地化，固定用插件名（用户指定）
+local ADDON_TITLE = "Easy Cooldown Glow"
+
+-- 暴雪设置里的占位页宽度：与配置窗口宽度无关，用较小值避免超出暴雪设置画布
+local STUB_W = 520
+
+local configFrame
 local rows = {}          -- 行池（复用）
 local refreshing = false -- RefreshPanel 递归守卫
-
--- 插件名（用于设置分类标题）
-local function GetAddonTitle()
-    local fn = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
-    if fn then
-        local ok, title = pcall(fn, CG.ADDON_NAME, "Title")
-        if ok and title and title ~= "" then return title end
-    end
-    return "Easy Cooldown Glow"
-end
-local ADDON_TITLE = GetAddonTitle()
 
 -- =========================================================
 -- 小工具
@@ -54,20 +57,6 @@ local function AddTip(widget, text)
         if prevLeave then prevLeave(self, ...) end
         GameTooltip:Hide()
     end)
-end
-
--- 战斗中禁用全部可编辑控件 + 显示红色提示
-local function UpdateCombatState()
-    local locked = InCombatLockdown() and true or false
-    if panel and panel.combatWarning then
-        panel.combatWarning:SetShown(locked)
-    end
-    for _, row in ipairs(rows) do
-        row.durDd:SetEnabled(not locked)
-    end
-    if panel and panel.enableCheck then
-        panel.enableCheck:SetEnabled(not locked)
-    end
 end
 
 -- 下拉按钮的显示文字（不同版本方法名可能有差异，优先 SetText）
@@ -98,12 +87,12 @@ end
 -- 行控件
 -- =========================================================
 local function CreateRow(index)
-    local row = CreateFrame("Frame", nil, panel.rows)
+    local row = CreateFrame("Frame", nil, configFrame.rows)
     row:SetSize(ROW_W, ROW_H)
     row:SetPoint("TOPLEFT", 0, -(index - 1) * ROW_H)
 
     -- 图标做成可悬停按钮：鼠标移上显示技能提示。
-    -- ⚠️ 垂直对齐：与下方 durDd（BOTTOMLEFT, y=4, 高 24 → 中心线 y=16）同一中心，
+    -- ⚠️ 垂直对齐：与 durDd（BOTTOMLEFT, y=4, 高 24 → 中心线 y=16）同一中心，
     --    图标高 20 → 底边 y=6；名字锚在图标 RIGHT（垂直居中跟随），状态文字锚在名字 RIGHT。
     row.icon = CreateFrame("Button", nil, row)
     row.icon:SetSize(20, 20)
@@ -183,12 +172,10 @@ local function BuildRowList()
     return list
 end
 
-function CG.RefreshPanel()
-    if not panel or refreshing then return end
-    refreshing = true
+local function DoRefresh()
+    if not configFrame then return end
 
-    -- 当前专精名（⚠️ GetSpecializationInfo 第 1 个返回值是 specID，名字是第 2 个；
-    -- 直接取第 2 个返回值，否则会显示成 253 这类数字）
+    -- 当前专精名（⚠️ GetSpecializationInfo 第 1 个返回值是 specID，名字是第 2 个）
     local specName = L("SPEC_UNKNOWN")
     local idx = GetSpecialization()
     if idx and idx > 0 then
@@ -199,7 +186,11 @@ function CG.RefreshPanel()
             specName = tostring(id)
         end
     end
-    panel.specText:SetText(L("SPEC_LABEL") .. ": " .. specName)
+    configFrame.specText:SetText(L("SPEC_LABEL") .. ": " .. specName)
+
+    if configFrame.enableCheck then
+        configFrame.enableCheck:SetChecked(CG.IsEnabled())
+    end
 
     local list = BuildRowList()
     local barSet = CG.GetBarSpellIDs()
@@ -222,52 +213,70 @@ function CG.RefreshPanel()
     end
 
     local count = math.max(#list, 1)
-    panel.noSpells:SetShown(#list == 0)
-    panel.rows:SetSize(ROW_W, count * ROW_H)
+    -- 空列表：隐藏滚动区（其自带底板会盖住提示文字），只显示提示
+    local empty = (#list == 0)
+    configFrame.noSpells:SetShown(empty)
+    configFrame.scroll:SetShown(not empty)
+    configFrame.rows:SetSize(ROW_W, count * ROW_H)
+    -- 内容尺寸变化后让 ScrollFrame 重算滚动范围（超出即自动显示滚动条，否则隐藏）
+    if configFrame.scroll.UpdateScrollChildRect then
+        pcall(configFrame.scroll.UpdateScrollChildRect, configFrame.scroll)
+    end
 
-    -- 面板高度 = 头部（面板顶 → 行区域顶） + 行区域 + 底部留白。
-    -- 头部高度取运行时实际几何（描述行数会随语言变化，不能用常量）；几何不可用时用兜底值。
-    local pTop, rTop = panel:GetTop(), panel.rows:GetTop()
+    -- 窗口高度 = 顶部（窗口顶 → 滚动区顶） + 固定列表高度 + 底部留白。
+    -- 顶部高度取运行时实际几何（提示文字行数会随语言变化，不能用常量）；几何不可用时用兜底值。
+    local pTop, rTop = configFrame:GetTop(), configFrame.scroll:GetTop()
     local headerH = (pTop and rTop and pTop > rTop) and (pTop - rTop) or 110
-    panel:SetSize(PANEL_W, headerH + count * ROW_H + 16)
+    configFrame:SetSize(PANEL_W, headerH + LIST_H + 20)
+end
 
-    UpdateCombatState()
+-- ⚠️ refreshing 守卫必须无条件复位：刷新中途一旦抛错，若不复位，之后所有刷新都会被守卫挡掉
+--    → 面板从此不再更新（表现为「配置像是丢了」）。
+function CG.RefreshPanel()
+    if not configFrame or refreshing then return end
+    refreshing = true
+    pcall(DoRefresh)
     refreshing = false
 end
 
 -- =========================================================
--- 面板构建 + 注册进暴雪设置
+-- 自有配置窗口
 -- =========================================================
-local function BuildPanel()
-    panel = CreateFrame("Frame")
-    panel:SetSize(PANEL_W, 200)
+local function BuildConfigFrame()
+    configFrame = CreateFrame("Frame", "EasyCooldownGlowConfigFrame", UIParent, "BasicFrameTemplateWithInset")
+    configFrame:SetSize(PANEL_W, 320)
+    configFrame:SetPoint("TOP", UIParent, "TOP", 0, -120)
+    configFrame:SetMovable(true)
+    configFrame:EnableMouse(true)
+    configFrame:SetClampedToScreen(true)
+    configFrame:SetFrameStrata("DIALOG")
+    configFrame:RegisterForDrag("LeftButton")
+    configFrame:SetScript("OnDragStart", configFrame.StartMoving)
+    configFrame:SetScript("OnDragStop", configFrame.StopMovingOrSizing)
+    configFrame:Hide()
 
-    -- canvas layout 要求的三函数：修改即时生效，故均为空 / 仅刷新
-    panel.OnCommit  = function() end
-    panel.OnDefault = function() end
-    panel.OnRefresh = function() if CG.RefreshPanel then CG.RefreshPanel() end end
+    -- 标题（不本地化，固定插件名）
+    local titleText = (configFrame.TitleContainer and configFrame.TitleContainer.TitleText) or configFrame.TitleText
+    if titleText then titleText:SetText(ADDON_TITLE) end
 
-    panel.title = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    panel.title:SetPoint("TOPLEFT", 16, -12)
-    panel.title:SetText(ADDON_TITLE)
+    -- 顶部提示：当前专精 + 一句话说明（用户要求配置页上也有一句提示）
+    configFrame.specText = configFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    configFrame.specText:SetPoint("TOPLEFT", 16, -36)
 
-    panel.specText = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    panel.specText:SetPoint("TOPLEFT", panel.title, "BOTTOMLEFT", 0, -6)
+    configFrame.desc = configFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    configFrame.desc:SetPoint("TOPLEFT", configFrame.specText, "BOTTOMLEFT", 0, -8)
+    configFrame.desc:SetWidth(PANEL_W - 40)
+    configFrame.desc:SetJustifyH("LEFT")
+    configFrame.desc:SetText(L("PAGE_DESC"))
 
-    panel.combatWarning = panel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    panel.combatWarning:SetPoint("LEFT", panel.specText, "RIGHT", 20, 0)
-    panel.combatWarning:SetTextColor(1, 0.3, 0.3)
-    panel.combatWarning:SetText(L("COMBAT_LOCKED"))
-    panel.combatWarning:Hide()
-
-    -- 全局启用开关（与专精提示同一行右侧）
-    panel.enableCheck = CreateFrame("CheckButton", nil, panel, "UICheckButtonTemplate")
-    panel.enableCheck:SetSize(24, 24)
-    panel.enableCheck:SetPoint("TOPRIGHT", -24, -8)
-    panel.enableLabel = panel.enableCheck:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    panel.enableLabel:SetPoint("LEFT", panel.enableCheck, "RIGHT", 2, 0)
-    panel.enableLabel:SetText(L("ENABLE"))
-    panel.enableCheck:SetScript("OnClick", function(self)
+    -- 全局启用开关（窗口右上角）
+    configFrame.enableCheck = CreateFrame("CheckButton", nil, configFrame, "UICheckButtonTemplate")
+    configFrame.enableCheck:SetSize(24, 24)
+    configFrame.enableCheck:SetPoint("TOPRIGHT", -14, -24)
+    configFrame.enableLabel = configFrame.enableCheck:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    configFrame.enableLabel:SetPoint("LEFT", configFrame.enableCheck, "RIGHT", 2, 0)
+    configFrame.enableLabel:SetText(L("ENABLE"))
+    configFrame.enableCheck:SetScript("OnClick", function(self)
         if InCombatLockdown() then
             self:SetChecked(not self:GetChecked())
             return
@@ -275,46 +284,145 @@ local function BuildPanel()
         CG.SetEnabled(self:GetChecked() and true or false)
     end)
 
-    panel.desc = panel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    panel.desc:SetPoint("TOPLEFT", panel.specText, "BOTTOMLEFT", 0, -8)
-    panel.desc:SetWidth(PANEL_W - 48)
-    panel.desc:SetJustifyH("LEFT")
-    panel.desc:SetText(L("PAGE_DESC"))
+    configFrame.noSpells = configFrame:CreateFontString(nil, "OVERLAY", "GameFontDisable")
+    configFrame.noSpells:SetPoint("TOPLEFT", configFrame.desc, "BOTTOMLEFT", 0, -12)
+    configFrame.noSpells:SetWidth(PANEL_W - 40)
+    configFrame.noSpells:SetJustifyH("LEFT")
+    configFrame.noSpells:SetText(L("NO_SPELLS"))
+    configFrame.noSpells:Hide()
 
-    panel.noSpells = panel:CreateFontString(nil, "OVERLAY", "GameFontDisable")
-    panel.noSpells:SetPoint("TOPLEFT", panel.desc, "BOTTOMLEFT", 0, -14)
-    panel.noSpells:SetWidth(PANEL_W - 32)
-    panel.noSpells:SetJustifyH("LEFT")
-    panel.noSpells:SetText(L("NO_SPELLS"))
-    panel.noSpells:Hide()
+    -- 列表区：固定高度的滚动区（行数超过可见行数时出现滚动条，支持鼠标滚轮）
+    configFrame.scroll = CreateFrame("ScrollFrame", "EasyCooldownGlowConfigScroll", configFrame, "UIPanelScrollFrameTemplate")
+    configFrame.scroll:SetPoint("TOPLEFT", configFrame.desc, "BOTTOMLEFT", 8, -14)
+    configFrame.scroll:SetSize(ROW_W, LIST_H)
+    configFrame.scroll:EnableMouseWheel(true)
+    configFrame.scroll:SetScript("OnMouseWheel", function(self, delta)
+        local bar = self.ScrollBar or _G["EasyCooldownGlowConfigScrollScrollBar"]
+        if not bar or not bar:IsShown() then return end
+        local lo, hi = bar:GetMinMaxValues()
+        local v = (bar:GetValue() or 0) - delta * ROW_H
+        if v < lo then v = lo elseif v > hi then v = hi end
+        bar:SetValue(v)
+    end)
 
-    panel.rows = CreateFrame("Frame", nil, panel)
-    panel.rows:SetPoint("TOPLEFT", panel.desc, "BOTTOMLEFT", 8, -14)
-    panel.rows:SetSize(ROW_W, ROW_H)
+    configFrame.rows = CreateFrame("Frame", nil, configFrame.scroll)
+    configFrame.rows:SetPoint("TOPLEFT", configFrame.scroll, "TOPLEFT", 0, 0)
+    configFrame.rows:SetSize(ROW_W, LIST_H)
+    configFrame.scroll:SetScrollChild(configFrame.rows)
 
-    -- 设置页显隐：打开时重扫 CDM 主冷却列表并刷新面板
-    panel:SetScript("OnShow", function()
+    -- ⚠️ UIPanelScrollFrameTemplate 的滚动条【默认锚在滚动区右侧外部】（右缘约在滚动区右缘
+    -- 之外 13px），会越过窗口右边界（easyButtonAuraByCDM 踩过此坑）。
+    -- 模板把滚动条存在 `ScrollBar` 字段（大写 S）、全局名 <帧名>.."ScrollBar"。
+    -- 显式 ClearAllPoints 后把滚动条【右缘】贴到滚动区【内部右缘】（内缩 2px）。
+    local bar = configFrame.scroll.ScrollBar or _G["EasyCooldownGlowConfigScrollScrollBar"]
+    if bar then
+        bar:ClearAllPoints()
+        bar:SetPoint("TOPRIGHT", configFrame.scroll, "TOPRIGHT", -2, -14)
+        bar:SetPoint("BOTTOMRIGHT", configFrame.scroll, "BOTTOMRIGHT", -2, 14)
+    end
+
+    -- 窗口显隐：打开时重扫 CDM 主冷却列表并刷新面板
+    configFrame:SetScript("OnShow", function()
         CG.EnsureDB()
-        if panel.enableCheck then
-            panel.enableCheck:SetChecked(CG.IsEnabled())
-        end
         CG.Rescan()
         CG.RefreshPanel()
     end)
 end
 
+-- 打开配置窗口（战斗中不允许打开）
+function CG.ShowConfigFrame()
+    if InCombatLockdown() then return end
+    if not configFrame then BuildConfigFrame() end
+    configFrame:Show()
+end
+
+-- /ecg 与占位页按钮：切换配置窗口显隐（战斗中不响应）
+function CG.ToggleConfigFrame()
+    if InCombatLockdown() then return end
+    if not configFrame then BuildConfigFrame() end
+    if configFrame:IsShown() then
+        configFrame:Hide()
+    else
+        configFrame:Show()
+    end
+end
+
+-- 战斗状态切换（主文件 PLAYER_REGEN_DISABLED / ENABLED 调用）：
+-- 战斗中直接隐藏配置窗口并记住；战斗结束若此前是打开状态则恢复。
+function CG.OnCombatChanged(inCombat)
+    if not configFrame then return end
+    if inCombat then
+        if configFrame:IsShown() then
+            CG._restoreConfig = true
+            configFrame:Hide()
+        end
+    elseif CG._restoreConfig then
+        CG._restoreConfig = nil
+        CG.ShowConfigFrame()
+    end
+end
+
+-- =========================================================
+-- 暴雪插件设置里的占位页（提示 + 按钮）
+-- =========================================================
+local function BuildBlizzardStub()
+    local stub = CreateFrame("Frame")
+    stub:SetSize(STUB_W, 200)
+
+    -- canvas layout 要求的三函数：本页无实际设置，故均为空实现
+    stub.OnCommit  = function() end
+    stub.OnDefault = function() end
+    stub.OnRefresh = function() end
+
+    local hint = stub:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    hint:SetPoint("TOP", stub, "TOP", 0, -40)
+    hint:SetWidth(STUB_W - 40)
+    hint:SetJustifyH("CENTER")
+    hint:SetText(L("STUB_HINT"))
+
+    local template = "SharedButtonLargeTemplate"
+    local hasTemplate = false
+    if C_XMLUtil and C_XMLUtil.GetTemplateInfo then
+        local ok, info = pcall(C_XMLUtil.GetTemplateInfo, template)
+        hasTemplate = ok and info ~= nil
+    end
+    if not hasTemplate then template = "UIPanelDynamicResizeButtonTemplate" end
+    local button = CreateFrame("Button", nil, stub, template)
+    button:SetText(L("OPEN_OPTIONS"))
+    button.padding = 40
+    if DynamicResizeButton_Resize then pcall(DynamicResizeButton_Resize, button) end
+    button:SetPoint("TOP", hint, "BOTTOM", 0, -30)
+    button:SetScript("OnClick", function() CG.ToggleConfigFrame() end)
+
+    return stub
+end
+
 local function RegisterSettings()
-    if panel then return end
+    if CG._stubRegistered then return end
     if not Settings or not Settings.RegisterCanvasLayoutCategory then return end
-    BuildPanel()
-    local category = Settings.RegisterCanvasLayoutCategory(panel, ADDON_TITLE)
+    CG._stubRegistered = true
+    local stub = BuildBlizzardStub()
+    -- 分类名不本地化，固定用插件名（用户指定）
+    local category = Settings.RegisterCanvasLayoutCategory(stub, ADDON_TITLE)
     Settings.RegisterAddOnCategory(category)
 end
 
+-- =========================================================
+-- slash 命令：/ecg 打开自有配置窗口
+-- =========================================================
+SLASH_EASYCOOLDOWNGLOW1 = "/ecg"
+SlashCmdList["EASYCOOLDOWNGLOW"] = function()
+    CG.ToggleConfigFrame()
+end
+
+-- =========================================================
+-- 启动
+-- =========================================================
 local boot = CreateFrame("Frame")
 boot:RegisterEvent("PLAYER_LOGIN")
 boot:SetScript("OnEvent", function(self, event)
     self:UnregisterEvent(event)
     RegisterSettings()
-    if CG.RefreshPanel then CG.RefreshPanel() end
+    BuildConfigFrame()
+    CG.RefreshPanel()
 end)

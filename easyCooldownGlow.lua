@@ -11,7 +11,8 @@
 --   · 库文件内嵌在本插件 Libs/ 下（LibStub + LibCustomGlow-1.0），不依赖其他插件携带。
 --   · 发光时长档位新增「无」：某技能可配置为完全不发光（durations[sid] = -1）。
 --   · 存档为独立 easyCooldownGlowDB（## SavedVariablesPerCharacter，按当前专精保存时长表）。
---   · 设置界面见 Options.lua（集成暴雪设置，战斗中禁用）；无 slash 命令。
+--   · 设置界面：暴雪设置里只留占位页（提示 + 按钮），配置在独立窗口
+--     （/ecg 或占位页按钮打开）；战斗中窗口直接隐藏，战斗结束自动恢复。
 --   · 绝不隐藏 / 移动 CDM 原有显示：CDM 只被【只读】使用（扫 EssentialCooldownViewer 的
 --     active item 得到用户实际启用的主冷却技能集合）。
 --
@@ -42,7 +43,8 @@ local LOCALES = {
         DUR_SEC           = "%d sec",
         DUR_NONE          = "None",
         STATUS_NOT_ON_BAR = "not on action bars",
-        COMBAT_LOCKED     = "Settings cannot be changed during combat.",
+        OPEN_OPTIONS      = "Open Options",
+        STUB_HINT         = "Click the button below, or type /ecg, to open the configuration window.",
     },
     zhCN = {
         SPEC_LABEL        = "当前专精",
@@ -55,7 +57,8 @@ local LOCALES = {
         DUR_SEC           = "%d 秒",
         DUR_NONE          = "无",
         STATUS_NOT_ON_BAR = "不在动作条上",
-        COMBAT_LOCKED     = "战斗中无法修改设置。",
+        OPEN_OPTIONS      = "打开配置",
+        STUB_HINT         = "点击按钮，或者输入 /ecg 打开配置窗口。",
     },
     zhTW = {
         SPEC_LABEL        = "目前專精",
@@ -68,7 +71,8 @@ local LOCALES = {
         DUR_SEC           = "%d 秒",
         DUR_NONE          = "無",
         STATUS_NOT_ON_BAR = "不在快捷列上",
-        COMBAT_LOCKED     = "戰鬥中無法修改設定。",
+        OPEN_OPTIONS      = "開啟設定",
+        STUB_HINT         = "點擊按鈕，或者輸入 /ecg 開啟設定視窗。",
     },
 }
 
@@ -595,6 +599,8 @@ evFrame:RegisterEvent("SPELL_UPDATE_CHARGES")   -- 充能技能冷却变化
 evFrame:RegisterEvent("SPELLS_CHANGED")
 evFrame:RegisterEvent("PLAYER_TALENT_UPDATE")
 evFrame:RegisterEvent("ACTIVE_TALENT_GROUP_CHANGED")
+evFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
+evFrame:RegisterEvent("PLAYER_REGEN_DISABLED")
 
 evFrame:SetScript("OnEvent", function(_, event)
     -- 槽位内容可能变化（换技能/翻页/姿态/载具/天赋）→ 失效 spellID 缓存
@@ -614,6 +620,12 @@ evFrame:SetScript("OnEvent", function(_, event)
                 if CG.IsEnabled() then ScheduleEvaluate() end
             end)
         end
+    elseif event == "PLAYER_REGEN_ENABLED" then
+        -- 战斗结束：配置窗口若此前因进战斗被隐藏则恢复
+        if CG.OnCombatChanged then CG.OnCombatChanged(false) end
+    elseif event == "PLAYER_REGEN_DISABLED" then
+        -- 进入战斗：隐藏配置窗口
+        if CG.OnCombatChanged then CG.OnCombatChanged(true) end
     else
         -- 动作条切换 / 冷却变化 / 天赋变动：合并到下一帧统一评估（同帧多次事件只评估一次）
         ScheduleEvaluate()

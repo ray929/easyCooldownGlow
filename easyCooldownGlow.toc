@@ -1,4 +1,4 @@
-## Interface: 120100
+## Interface: 120100, 16001
 ## Title: Easy Cooldown Glow
 ## Title-zhCN: CDM 动作条冷却发光
 ## Title-zhTW: CDM 快捷列冷卻發光
@@ -7,6 +7,7 @@
 ## Notes-zhTW: 暴雪冷卻管理器(CDM)主冷卻分組中已啟用的技能，冷卻完成後在對應快捷列按鈕上發光提醒；發光時長可設定（無/1-5秒/持續）。
 ## Author: ray929
 ## Version: @project-version@
+## X-Curse-Project-ID: 1733480
 ## SavedVariablesPerCharacter: easyCooldownGlowDB
 ## DefaultState: enabled
 ## Category: Action Bars
