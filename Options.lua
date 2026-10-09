@@ -186,7 +186,10 @@ local function DoRefresh()
             specName = tostring(id)
         end
     end
-    configFrame.specText:SetText(L("SPEC_LABEL") .. ": " .. specName)
+    -- 头部信息行：当前职业 + 配置专精（存档槽位）
+    configFrame.specText:SetText(
+        L("CLASS_LABEL") .. ": " .. (UnitClass("player"))
+        .. "　　" .. L("SPEC_LABEL") .. ": " .. specName)
 
     if configFrame.enableCheck then
         configFrame.enableCheck:SetChecked(CG.IsEnabled())
@@ -266,11 +269,11 @@ local function BuildConfigFrame()
     configFrame.divTitle:SetSize(PANEL_W - 24, 1)
     configFrame.divTitle:SetPoint("TOPLEFT", 12, -64)
 
-    -- 顶部提示：当前专精（说明文字已按用户要求去掉）
+    -- 顶部提示：当前职业 + 配置专精（说明文字已按用户要求去掉）
     configFrame.specText = configFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     configFrame.specText:SetPoint("TOPLEFT", 16, -36)
 
-    -- 全局启用开关（窗口右上角）
+    -- 启用开关（专精级：只关当前专精的发光；整体关闭请禁用插件；窗口右上角）
     configFrame.enableCheck = CreateFrame("CheckButton", nil, configFrame, "UICheckButtonTemplate")
     configFrame.enableCheck:SetSize(24, 24)
     configFrame.enableCheck:SetPoint("TOPRIGHT", -14, -36)

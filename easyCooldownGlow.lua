@@ -10,7 +10,7 @@
 --   · 全静默：无任何 print / 弹窗；开关变化不提示（工作区约定）。
 --   · 库文件内嵌在本插件 Libs/ 下（LibStub + LibCustomGlow-1.0），不依赖其他插件携带。
 --   · 发光时长档位新增「无」：某技能可配置为完全不发光（durations[sid] = -1）。
---   · 存档为独立 easyCooldownGlowDB（## SavedVariablesPerCharacter，按当前专精保存时长表）。
+--   · 存档为独立 easyCooldownGlowDB（## SavedVariablesPerCharacter，全部配置按当前专精保存）。
 --   · 设置界面：暴雪设置里只留占位页（提示 + 按钮），配置在独立窗口
 --     （/ecg 或占位页按钮打开）；战斗中窗口直接隐藏，战斗结束自动恢复。
 --   · 绝不隐藏 / 移动 CDM 原有显示：CDM 只被【只读】使用（扫 EssentialCooldownViewer 的
@@ -33,11 +33,12 @@ local LCG = LibStub and LibStub("LibCustomGlow-1.0", true)
 -- =========================================================
 local LOCALES = {
     enUS = {
-        SPEC_LABEL        = "Current Specialization",
+        SPEC_LABEL        = "Config Spec",
+        CLASS_LABEL       = "Current Class",
         SPEC_UNKNOWN      = "Unknown",
         PAGE_DESC         = "Spells enabled in Blizzard's Cooldown Manager (Essential cooldowns) glow on the action bar when their cooldown finishes. Pick how long each spell stays lit.",
         NO_SPELLS         = "No spells found. Enable cooldowns in Blizzard's Cooldown Manager (Essential cooldowns) first, then reopen this page.",
-        ENABLE            = "Global Enable",
+        ENABLE            = "Enable",
         COL_DURATION      = "Glow",
         DUR_PERSISTENT    = "Persistent",
         DUR_SEC           = "%d sec",
@@ -47,11 +48,12 @@ local LOCALES = {
         STUB_HINT         = "Click the button below, or type /ecg, to open the configuration window.",
     },
     zhCN = {
-        SPEC_LABEL        = "当前专精",
+        SPEC_LABEL        = "配置专精",
+        CLASS_LABEL       = "当前职业",
         SPEC_UNKNOWN      = "未知",
         PAGE_DESC         = "暴雪冷却管理器「主冷却」分组中已启用的技能，冷却完成后在动作条按钮上发光提醒。可逐个技能设置发光时长。",
         NO_SPELLS         = "未找到可配置的技能。请先在暴雪冷却管理器的「主冷却」里启用技能，然后重新打开本页面。",
-        ENABLE            = "全局启用",
+        ENABLE            = "启用",
         COL_DURATION      = "发光",
         DUR_PERSISTENT    = "持续",
         DUR_SEC           = "%d 秒",
@@ -61,11 +63,12 @@ local LOCALES = {
         STUB_HINT         = "点击按钮，或者输入 /ecg 打开配置窗口。",
     },
     zhTW = {
-        SPEC_LABEL        = "目前專精",
+        SPEC_LABEL        = "配置專精",
+        CLASS_LABEL       = "目前職業",
         SPEC_UNKNOWN      = "未知",
         PAGE_DESC         = "暴雪冷卻管理器「主冷卻」分組中已啟用的技能，冷卻完成後在快捷列按鈕上發光提醒。可逐個技能設定發光時長。",
         NO_SPELLS         = "找不到可設定的技能。請先在暴雪冷卻管理器的「主冷卻」中啟用技能，然後重新開啟本頁面。",
-        ENABLE            = "全域啟用",
+        ENABLE            = "啟用",
         COL_DURATION      = "發光",
         DUR_PERSISTENT    = "持續",
         DUR_SEC           = "%d 秒",
@@ -127,30 +130,16 @@ local ScheduleEvaluate
 local SetExpiry
 
 -- =========================================================
--- 存档（easyCooldownGlowDB，角色级；时长表按专精保存）
+-- 存档（easyCooldownGlowDB，角色级文件；全部配置在专精级 specs[specID] 子表，
+-- 2026-10-09 起启用开关也下沉——想整体关闭直接在插件列表禁用插件）
+--   enabled：本专精显示开关（旧版角色级根字段仅在首次访问专精槽时作迁移种子）
 --   durations[sid] = nil / 0 → 持续常亮（默认）
 --                    -1      → 无（不发光）
 --                    1..5    → 就绪后亮 N 秒自动熄灭
 -- =========================================================
 function CG.EnsureDB()
     easyCooldownGlowDB = easyCooldownGlowDB or {}
-    if easyCooldownGlowDB.enabled == nil then
-        easyCooldownGlowDB.enabled = true
-    end
-end
-
-function CG.IsEnabled()
-    return easyCooldownGlowDB and easyCooldownGlowDB.enabled ~= false
-end
-
-function CG.SetEnabled(v)
-    CG.EnsureDB()
-    easyCooldownGlowDB.enabled = v and true or false
-    if v then
-        CG.Start()
-    else
-        CG.StopAll()
-    end
+    -- enabled 已下沉为专精级：根级旧字段仅作为迁移种子保留，不再读写、不再设默认值。
 end
 
 -- 当前专精 ID（无专精返回 0）
@@ -163,14 +152,44 @@ local function GetCurrentSpecID()
 end
 CG.GetCurrentSpecID = GetCurrentSpecID
 
-local function GetDurations(specID)
+-- 取（必要时创建）当前专精槽；槽内 enabled 缺失时从根级旧字段播种（迁移）
+local function GetSpecSlot(specID)
     CG.EnsureDB()
     local db = easyCooldownGlowDB
     db.specs = db.specs or {}
     local spec = db.specs[specID] or {}
     db.specs[specID] = spec
+    if spec.enabled == nil then
+        spec.enabled = (easyCooldownGlowDB.enabled ~= false)
+    end
     spec.durations = spec.durations or {}
-    return spec.durations
+    return spec
+end
+
+-- 启用开关（专精级：只关当前专精的发光；整体关闭请禁用插件）。
+-- 只读、不建槽：调用点含热路径（Evaluate），避免每次访问都触碰存档结构。
+function CG.IsEnabled()
+    if not easyCooldownGlowDB then return nil end
+    local specs = easyCooldownGlowDB.specs
+    local spec = specs and specs[GetCurrentSpecID()]
+    if spec and spec.enabled ~= nil then
+        return spec.enabled
+    end
+    return easyCooldownGlowDB.enabled ~= false   -- 旧根字段回退（迁移种子）
+end
+
+function CG.SetEnabled(v)
+    local spec = GetSpecSlot(GetCurrentSpecID())
+    spec.enabled = v and true or false
+    if v then
+        CG.Start()
+    else
+        CG.StopAll()
+    end
+end
+
+local function GetDurations(specID)
+    return GetSpecSlot(specID).durations
 end
 
 -- 读取某技能当前的发光档位（-1 / 0 / 1..5；无记录 = 0 持续）
