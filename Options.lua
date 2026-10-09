@@ -259,22 +259,23 @@ local function BuildConfigFrame()
     local titleText = (configFrame.TitleContainer and configFrame.TitleContainer.TitleText) or configFrame.TitleText
     if titleText then titleText:SetText(ADDON_TITLE) end
 
-    -- 顶部提示：当前专精 + 一句话说明（用户要求配置页上也有一句提示）
+    -- 标题栏下分割线（三窗统一）
+    configFrame.divTitle = configFrame:CreateTexture(nil, "ARTWORK")
+    configFrame.divTitle:SetColorTexture(0.7, 0.7, 0.7, 0.35)
+    configFrame.divTitle:SetSize(PANEL_W - 24, 1)
+    configFrame.divTitle:SetPoint("TOPLEFT", 12, -31)
+
+    -- 顶部提示：当前专精（说明文字已按用户要求去掉）
     configFrame.specText = configFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     configFrame.specText:SetPoint("TOPLEFT", 16, -36)
-
-    configFrame.desc = configFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    configFrame.desc:SetPoint("TOPLEFT", configFrame.specText, "BOTTOMLEFT", 0, -8)
-    configFrame.desc:SetWidth(PANEL_W - 40)
-    configFrame.desc:SetJustifyH("LEFT")
-    configFrame.desc:SetText(L("PAGE_DESC"))
 
     -- 全局启用开关（窗口右上角）
     configFrame.enableCheck = CreateFrame("CheckButton", nil, configFrame, "UICheckButtonTemplate")
     configFrame.enableCheck:SetSize(24, 24)
-    configFrame.enableCheck:SetPoint("TOPRIGHT", -14, -24)
+    configFrame.enableCheck:SetPoint("TOPRIGHT", -14, -36)
     configFrame.enableLabel = configFrame.enableCheck:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    configFrame.enableLabel:SetPoint("LEFT", configFrame.enableCheck, "RIGHT", 2, 0)
+    -- 标签锚在复选框左侧：向右伸出会越过窗口右边界（CDM / byUnit 同款约定）
+    configFrame.enableLabel:SetPoint("RIGHT", configFrame.enableCheck, "LEFT", -4, 0)
     configFrame.enableLabel:SetText(L("ENABLE"))
     configFrame.enableCheck:SetScript("OnClick", function(self)
         if InCombatLockdown() then
@@ -285,7 +286,7 @@ local function BuildConfigFrame()
     end)
 
     configFrame.noSpells = configFrame:CreateFontString(nil, "OVERLAY", "GameFontDisable")
-    configFrame.noSpells:SetPoint("TOPLEFT", configFrame.desc, "BOTTOMLEFT", 0, -12)
+    configFrame.noSpells:SetPoint("TOPLEFT", configFrame.specText, "BOTTOMLEFT", 0, -12)
     configFrame.noSpells:SetWidth(PANEL_W - 40)
     configFrame.noSpells:SetJustifyH("LEFT")
     configFrame.noSpells:SetText(L("NO_SPELLS"))
@@ -293,7 +294,7 @@ local function BuildConfigFrame()
 
     -- 列表区：固定高度的滚动区（行数超过可见行数时出现滚动条，支持鼠标滚轮）
     configFrame.scroll = CreateFrame("ScrollFrame", "EasyCooldownGlowConfigScroll", configFrame, "UIPanelScrollFrameTemplate")
-    configFrame.scroll:SetPoint("TOPLEFT", configFrame.desc, "BOTTOMLEFT", 8, -14)
+    configFrame.scroll:SetPoint("TOPLEFT", configFrame.specText, "BOTTOMLEFT", 8, -14)
     configFrame.scroll:SetSize(ROW_W, LIST_H)
     configFrame.scroll:EnableMouseWheel(true)
     configFrame.scroll:SetScript("OnMouseWheel", function(self, delta)
