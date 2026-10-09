@@ -9,6 +9,7 @@
 - Works during combat, in and out. The original Cooldown Manager display is left untouched (nothing hidden or moved).
 - Blizzard's add-on settings page holds a shortcut with a button; the full configuration window can also be opened with the `/ecg` slash command.
 - The configuration window hides automatically during combat and reopens when combat ends (if it was open).
+- All Easy add-ons share one minimap button: left-click opens a menu to each add-on's config; right-drag moves the button.
 
 ## 简体中文
 
@@ -19,6 +20,7 @@
 - 战斗内外均生效。冷却管理器原本的显示保持原样，不会被隐藏或移动。
 - 暴雪插件设置页提供快捷入口（提示 + 按钮）；完整配置窗口也可用 `/ecg` 斜杠命令打开。
 - 配置窗口在战斗中自动隐藏，战斗结束后若此前是打开状态则自动恢复。
+- Easy 系列插件共享一个小地图按钮：左键弹菜单打开各插件配置，右键拖动移动按钮。
 
 ## 繁體中文
 
@@ -29,6 +31,7 @@
 - 戰鬥內外均生效。冷卻管理器原本的顯示維持原樣，不會被隱藏或移動。
 - 暴雪插件設定頁提供快速入口（提示 + 按鈕）；完整設定視窗也可用 `/ecg` 斜線指令開啟。
 - 設定視窗在戰鬥中自動隱藏，戰鬥結束後若此前是開啟狀態則自動恢復。
+- Easy 系列插件共用一個小地圖按鈕：左鍵彈出選單開啟各插件設定，右鍵拖動移動按鈕。
 
 ## Credits / 致谢 / 致謝
 
