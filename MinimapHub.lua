@@ -101,9 +101,6 @@ if IS_CREATOR then
     btn:SetFrameStrata("MEDIUM")
     btn:SetFrameLevel(8)
     btn:SetSize(31, 31)
-    -- 整体缩到 0.92：SetScale 以按钮中心为基准缩放，金环与图标仍同心，
-    -- 视觉上比其它小地图按钮略小一点（用户反馈「尺寸再小一点」）
-    btn:SetScale(0.92)
     btn:RegisterForClicks("AnyUp")
     -- 高亮走库的标准做法：SetHighlightTexture 把 54×54 高亮图拉伸铺满 31×31 按钮，
     -- 光晕圆心自然落在按钮中心（此前用独立 54×54 HIGHLIGHT 纹理锚 TOPLEFT，
@@ -111,14 +108,14 @@ if IS_CREATOR then
     btn:SetHighlightTexture("Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight")
 
     -- 图标：17×17（LibDBIcon 同款尺寸，正好落在金环内孔里）。
-    -- Icon.tga 是 128×128 方图，**自带了金环**（内缘半径 36）——整张铺满会和暴雪
-    -- MiniMap-TrackingBorder 的金环叠成「双环」，看着歪。所以裁到内盘（30..97，
-    -- 半径 34 < 36，配合圆形遮罩正好完全避开自带金环），金环只留暴雪边框那一层。
+    -- 用预裁好的 ButtonIcon.tga（只含蓝盘 + E，自带金环已在出图时裁掉），不用 SetTexCoord：
+    -- EllesmereUIMinimap 的「黑框」行模式会把该纹理铺满按钮并强制改写 TexCoord，
+    -- 靠 TexCoord 裁图的话一进 Ellesmere 就会把自带金环重新露出来（「大小不对」的来源）。
     local icon = btn:CreateTexture(nil, "BACKGROUND")
     icon:SetSize(17, 17)
     icon:SetPoint("TOPLEFT", 7, -6)
-    icon:SetTexCoord(30 / 128, 98 / 128, 30 / 128, 98 / 128)
     icon:SetMask("Interface\\Minimap\\MinimapMask")
+    btn.icon = icon -- 让 Ellesmere 等整合插件直接认这个纹理，避免它自己扫描挑错纹理
 
     local border = btn:CreateTexture(nil, "OVERLAY")
     border:SetSize(54, 54)
@@ -283,7 +280,7 @@ end
 -- 本插件注册进共享按钮（此块在每个插件拷贝里各不相同）
 -- 菜单项显示 TOC 的英文插件名，不做本地化（该场景无本地化命名需求）
 -- =========================================================
-HUB.Register(ADDON_NAME, "Easy Cooldown Glow", "Interface\\AddOns\\easyCooldownGlow\\Icon.tga", function()
+HUB.Register(ADDON_NAME, "Easy Cooldown Glow", "Interface\\AddOns\\easyCooldownGlow\\ButtonIcon.tga", function()
     if EasyCooldownGlow and EasyCooldownGlow.ToggleConfigFrame then
         EasyCooldownGlow.ToggleConfigFrame()
     end
