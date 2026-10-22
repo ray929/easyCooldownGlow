@@ -83,9 +83,10 @@ if IS_CREATOR then
 
     local ITEM_H = 22
     local PAD    = 6
-    -- 按钮绕小地图的半径：按小地图实际直径推算（默认 140 → 90），
-    -- 金环整体落在小地图圆形边缘外侧，不压住地图内容；小地图被放大时同样自动适应
-    local RADIUS_BIAS = 20
+    -- 按钮绕小地图的半径：按小地图实际直径推算（默认 140 → 80），
+    -- 与 LibDBIcon / 暴雪原生按钮同一轨道（实测同屏其它按钮圆心就在这个半径上），
+    -- 金环压着小地图边缘一半内一半外，正是标准观感；小地图被放大时自动适应
+    local RADIUS_BIAS = 10
 
     -- ---------- 按钮本体（经典小地图按钮三层纹理结构） ----------
     local btn = CreateFrame("Button", "EasyMinimapButton", Minimap)
@@ -93,24 +94,23 @@ if IS_CREATOR then
     btn:SetFrameLevel(8)
     btn:SetSize(31, 31)
     btn:RegisterForClicks("AnyUp")
+    -- 高亮走库的标准做法：SetHighlightTexture 把 54×54 高亮图拉伸铺满 31×31 按钮，
+    -- 光晕圆心自然落在按钮中心（此前用独立 54×54 HIGHLIGHT 纹理锚 TOPLEFT，
+    -- 光晕圆心按原图左上区域摆放，与图标不同心，悬停时看着像「蓝圈歪了」）
+    btn:SetHighlightTexture("Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight")
 
-    -- 图标与金环同心：中心比按钮中心略上移 1px（与 LibDBIcon / 暴雪原生按钮的取法一致），
-    -- 尺寸 22 填满金环内孔（内孔约 23），比传统 18/20 更醒目
+    -- 图标：17×17（LibDBIcon 同款尺寸，正好落在金环内孔里），并裁掉 Icon.tga 自带的留白
+    -- （设计圆环只占 128 纹理的 20..107，不裁的话直径只剩 69%，看着偏小）
     local icon = btn:CreateTexture(nil, "BACKGROUND")
-    icon:SetSize(22, 22)
-    icon:SetPoint("CENTER", 0, 1)
+    icon:SetSize(17, 17)
+    icon:SetPoint("TOPLEFT", 7, -6)
+    icon:SetTexCoord(20 / 128, 108 / 128, 20 / 128, 108 / 128)
     icon:SetMask("Interface\\Minimap\\MinimapMask")
 
     local border = btn:CreateTexture(nil, "OVERLAY")
     border:SetSize(54, 54)
     border:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
     border:SetPoint("TOPLEFT")
-
-    local highlight = btn:CreateTexture(nil, "HIGHLIGHT")
-    highlight:SetSize(54, 54)
-    highlight:SetTexture("Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight")
-    highlight:SetPoint("TOPLEFT")
-    highlight:SetBlendMode("ADD")
 
     -- 按钮图标：取第一个注册进来的插件图标（见 HUB.SetIcon，只设一次）
     local iconSet = false
