@@ -129,7 +129,8 @@ if IS_CREATOR then
     btn.icon = icon -- 让 Ellesmere 等整合插件直接认这个纹理，避免它自己扫描挑错纹理
 
     local border = btn:CreateTexture(nil, "OVERLAY")
-    border:SetSize(HAS_COMPARTMENT and 50 or 53)
+    local borderSize = HAS_COMPARTMENT and 50 or 53
+    border:SetSize(borderSize, borderSize)
     border:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
     border:SetPoint("TOPLEFT")
 
