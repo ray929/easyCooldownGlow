@@ -107,18 +107,29 @@ if IS_CREATOR then
     -- 光晕圆心按原图左上区域摆放，与图标不同心，悬停时看着像「蓝圈歪了」）
     btn:SetHighlightTexture("Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight")
 
-    -- 图标：17×17（LibDBIcon 同款尺寸，正好落在金环内孔里）。
-    -- 用预裁好的 ButtonIcon.tga（只含蓝盘 + E，自带金环已在出图时裁掉），不用 SetTexCoord：
-    -- EllesmereUIMinimap 的「黑框」行模式会把该纹理铺满按钮并强制改写 TexCoord，
-    -- 靠 TexCoord 裁图的话一进 Ellesmere 就会把自带金环重新露出来（「大小不对」的来源）。
-    local icon = btn:CreateTexture(nil, "BACKGROUND")
-    icon:SetSize(17, 17)
-    icon:SetPoint("TOPLEFT", 7, -6)
+    -- 几何完全照抄 LibDBIcon-1.0（社区事实标准）。见本机任意一份
+    -- Libs/LibDBIcon-1.0/LibDBIcon-1.0.lua 的 ResetButtonBorder / ResetButtonIcon：
+    --   有插件抽屉（AddonCompartmentFrame）的客户端：边框 50×50 锚 TOPLEFT，图标 18×18 锚 CENTER
+    --   没有抽屉的旧客户端：                    边框 53×53 锚 TOPLEFT，图标 17×17 锚 TOPLEFT(7,-6)
+    -- 之前自定的「54×54 + 17×17 TOPLEFT(7,-6)」正是「圈比别家大、图标看着不居中」的原因。
+    local HAS_COMPARTMENT = _G.AddonCompartmentFrame ~= nil
+
+    -- 图标用预裁好的 ButtonIcon.tga（只含蓝盘 + E，自带金环已在出图时裁掉）。
+    -- 不用 SetTexCoord：Ellesmere 的「黑框」行模式会把该纹理铺满按钮并强制改写 TexCoord，
+    -- 靠 TexCoord 裁图的话一进 Ellesmere 就会把自带金环重新露出来。
+    local icon = btn:CreateTexture(nil, "ARTWORK")
+    if HAS_COMPARTMENT then
+        icon:SetSize(18, 18)
+        icon:SetPoint("CENTER")
+    else
+        icon:SetSize(17, 17)
+        icon:SetPoint("TOPLEFT", 7, -6)
+    end
     icon:SetMask("Interface\\Minimap\\MinimapMask")
     btn.icon = icon -- 让 Ellesmere 等整合插件直接认这个纹理，避免它自己扫描挑错纹理
 
     local border = btn:CreateTexture(nil, "OVERLAY")
-    border:SetSize(54, 54)
+    border:SetSize(HAS_COMPARTMENT and 50 or 53)
     border:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
     border:SetPoint("TOPLEFT")
 
