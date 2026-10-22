@@ -92,16 +92,18 @@ if IS_CREATOR then
 
     local ITEM_H = 22
     local PAD    = 6
-    -- 按钮绕小地图的半径：按小地图实际直径推算（默认 140 → 80），
-    -- 与 LibDBIcon / 暴雪原生按钮同一轨道（实测同屏其它按钮圆心就在这个半径上），
-    -- 金环压着小地图边缘一半内一半外，正是标准观感；小地图被放大时自动适应
-    local RADIUS_BIAS = 10
+    -- 按钮绕小地图的半径：按小地图实际直径推算（默认 140 → 77），
+    -- 与 LibDBIcon / 暴雪原生按钮基本同轨，再略向内收一点（用户反馈「往内侧一点点」）
+    local RADIUS_BIAS = 7
 
     -- ---------- 按钮本体（经典小地图按钮三层纹理结构） ----------
     local btn = CreateFrame("Button", "EasyMinimapButton", Minimap)
     btn:SetFrameStrata("MEDIUM")
     btn:SetFrameLevel(8)
     btn:SetSize(31, 31)
+    -- 整体缩到 0.92：SetScale 以按钮中心为基准缩放，金环与图标仍同心，
+    -- 视觉上比其它小地图按钮略小一点（用户反馈「尺寸再小一点」）
+    btn:SetScale(0.92)
     btn:RegisterForClicks("AnyUp")
     -- 高亮走库的标准做法：SetHighlightTexture 把 54×54 高亮图拉伸铺满 31×31 按钮，
     -- 光晕圆心自然落在按钮中心（此前用独立 54×54 HIGHLIGHT 纹理锚 TOPLEFT，
