@@ -99,12 +99,14 @@ if IS_CREATOR then
     -- 光晕圆心按原图左上区域摆放，与图标不同心，悬停时看着像「蓝圈歪了」）
     btn:SetHighlightTexture("Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight")
 
-    -- 图标：17×17（LibDBIcon 同款尺寸，正好落在金环内孔里），并裁掉 Icon.tga 自带的留白
-    -- （设计圆环只占 128 纹理的 20..107，不裁的话直径只剩 69%，看着偏小）
+    -- 图标：17×17（LibDBIcon 同款尺寸，正好落在金环内孔里）。
+    -- Icon.tga 是 128×128 方图，**自带了金环**（内缘半径 36）——整张铺满会和暴雪
+    -- MiniMap-TrackingBorder 的金环叠成「双环」，看着歪。所以裁到内盘（30..97，
+    -- 半径 34 < 36，配合圆形遮罩正好完全避开自带金环），金环只留暴雪边框那一层。
     local icon = btn:CreateTexture(nil, "BACKGROUND")
     icon:SetSize(17, 17)
     icon:SetPoint("TOPLEFT", 7, -6)
-    icon:SetTexCoord(20 / 128, 108 / 128, 20 / 128, 108 / 128)
+    icon:SetTexCoord(30 / 128, 98 / 128, 30 / 128, 98 / 128)
     icon:SetMask("Interface\\Minimap\\MinimapMask")
 
     local border = btn:CreateTexture(nil, "OVERLAY")
