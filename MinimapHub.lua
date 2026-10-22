@@ -92,9 +92,9 @@ if IS_CREATOR then
 
     local ITEM_H = 22
     local PAD    = 6
-    -- 按钮绕小地图的半径：按小地图实际直径推算（默认 140 → 80），
-    -- 与 LibDBIcon / 暴雪原生按钮同一轨道（实测同屏其它按钮圆心就在这个半径上）
-    local RADIUS_BIAS = 10
+    -- 按钮绕小地图的半径：按小地图实际直径推算（默认 140 → 78），
+    -- 与 LibDBIcon / 暴雪原生按钮基本同轨，再略向内收（用户微调）
+    local RADIUS_BIAS = 8
 
     -- ---------- 按钮本体（经典小地图按钮三层纹理结构） ----------
     local btn = CreateFrame("Button", "EasyMinimapButton", Minimap)
