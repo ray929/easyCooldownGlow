@@ -74,12 +74,21 @@ local L = (function()
 end)()
 
 if IS_CREATOR then
-    local db = EasyMinimapHubDB
-    if type(db) ~= "table" then
-        db = {}
-        EasyMinimapHubDB = db
+    -- 三个插件的 TOC 都声明了 EasyMinimapHubDB，登录时后加载者会用自己那份存档
+    -- 重新赋值同名全局变量（创建者是字母序最靠前的插件，它持有的是「先加载那份」，
+    -- 加载结束后就跟全局脱钩了）。若把表缓存成 local，拖动写进去的是这张脱钩的表，
+    -- 退出时三份存档写的都是最后加载者那张表 → 拖动结果凭空消失（表现为「位置不保存」）。
+    -- 所以一律经 DB() 取当前全局表，绝不缓存。
+    local function DB()
+        if type(EasyMinimapHubDB) ~= "table" then
+            EasyMinimapHubDB = {}
+        end
+        if EasyMinimapHubDB.angle == nil then
+            EasyMinimapHubDB.angle = 220
+        end
+        return EasyMinimapHubDB
     end
-    db.angle = db.angle or 220
+    DB()
 
     local ITEM_H = 22
     local PAD    = 6
@@ -124,7 +133,7 @@ if IS_CREATOR then
     end
 
     local function UpdatePosition()
-        local a = math.rad(db.angle)
+        local a = math.rad(DB().angle)
         local r = Minimap:GetWidth() / 2 + RADIUS_BIAS
         btn:SetPoint("CENTER", Minimap, "CENTER", math.cos(a) * r, math.sin(a) * r)
     end
@@ -139,7 +148,7 @@ if IS_CREATOR then
         px, py = px / s, py / s
         local dx, dy = px - mx, py - my
         if dx ~= 0 or dy ~= 0 then
-            db.angle = math.deg(math.atan2(dy, dx))
+            DB().angle = math.deg(math.atan2(dy, dx))
             UpdatePosition()
         end
     end)
@@ -251,6 +260,9 @@ if IS_CREATOR then
     end)
 
     UpdatePosition()
+    -- 创建时读到的是「创建者那份」存档；等本帧所有插件加载完（后续插件已把全局换成
+    -- 自己那份）再按最终全局重摆一次，保证用的是最后一次退出时保存的位置。
+    C_Timer.After(0, UpdatePosition)
 end -- IS_CREATOR
 
 -- =========================================================
