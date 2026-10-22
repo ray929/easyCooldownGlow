@@ -81,9 +81,11 @@ if IS_CREATOR then
     end
     db.angle = db.angle or 220
 
-    local RADIUS = 80
     local ITEM_H = 22
     local PAD    = 6
+    -- 按钮绕小地图的半径：按小地图实际直径推算（默认 140 → 90），
+    -- 金环整体落在小地图圆形边缘外侧，不压住地图内容；小地图被放大时同样自动适应
+    local RADIUS_BIAS = 20
 
     -- ---------- 按钮本体（经典小地图按钮三层纹理结构） ----------
     local btn = CreateFrame("Button", "EasyMinimapButton", Minimap)
@@ -92,9 +94,11 @@ if IS_CREATOR then
     btn:SetSize(31, 31)
     btn:RegisterForClicks("AnyUp")
 
+    -- 图标与金环同心：中心比按钮中心略上移 1px（与 LibDBIcon / 暴雪原生按钮的取法一致），
+    -- 尺寸 22 填满金环内孔（内孔约 23），比传统 18/20 更醒目
     local icon = btn:CreateTexture(nil, "BACKGROUND")
-    icon:SetSize(18, 18)
-    icon:SetPoint("CENTER", 1, -1)
+    icon:SetSize(22, 22)
+    icon:SetPoint("CENTER", 0, 1)
     icon:SetMask("Interface\\Minimap\\MinimapMask")
 
     local border = btn:CreateTexture(nil, "OVERLAY")
@@ -119,7 +123,8 @@ if IS_CREATOR then
 
     local function UpdatePosition()
         local a = math.rad(db.angle)
-        btn:SetPoint("CENTER", Minimap, "CENTER", math.cos(a) * RADIUS, math.sin(a) * RADIUS)
+        local r = Minimap:GetWidth() / 2 + RADIUS_BIAS
+        btn:SetPoint("CENTER", Minimap, "CENTER", math.cos(a) * r, math.sin(a) * r)
     end
 
     -- ---------- 右键拖动（绕小地图边缘，实时按光标方位角定位） ----------
