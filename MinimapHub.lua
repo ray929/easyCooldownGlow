@@ -89,7 +89,11 @@ if IS_CREATOR then
     local RADIUS_BIAS = 10
 
     -- ---------- 按钮本体（经典小地图按钮三层纹理结构） ----------
-    local btn = CreateFrame("Button", "EasyMinimapButton", Minimap)
+    -- 按钮刻意保持「匿名」（第二个参数传 nil）：EllesmereUIMinimap 等小地图整合插件会扫
+    -- Minimap 下「有名字且宽 ≥20」的按钮，按自己的弧线重排（用户的 EllesmereUI 存档里
+    -- 已收录过 EasyMinimapButton）；一旦被收录，它会在登录 / 重载后覆盖我们按存档 angle
+    -- 摆的位置，表现为「右键拖动后位置不保存」。匿名后它扫不到，位置完全由本插件存档决定。
+    local btn = CreateFrame("Button", nil, Minimap)
     btn:SetFrameStrata("MEDIUM")
     btn:SetFrameLevel(8)
     btn:SetSize(31, 31)
