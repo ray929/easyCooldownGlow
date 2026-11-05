@@ -142,13 +142,44 @@ function CG.EnsureDB()
     -- enabled 已下沉为专精级：根级旧字段仅作为迁移种子保留，不再读写、不再设默认值。
 end
 
--- 当前专精 ID（无专精返回 0）
-local function GetCurrentSpecID()
-    local idx = GetSpecialization()
-    if idx and idx > 0 then
-        return GetSpecializationInfo(idx) or 0
+-- =========================================================
+-- 专精 API 兼容层（12.x 正式服 / Forever 双客户端）
+--   全局 GetSpecialization / GetSpecializationInfo 自 11.2.0 起被标记废弃
+--   （Blizzard_DeprecatedSpecialization 提供转发壳）；Forever（Camelot，Interface 16001）
+--   客户端不再提供这两个全局，直接调用 = "attempt to call a nil value" 硬报错。
+--   正式途径改为 C_SpecializationInfo 命名空间，两边都存在时优先用命名空间版。
+--   两路都拿不到 → 返回 0（通用槽），绝不报错。
+-- =========================================================
+local function SpecGetIndex()
+    if C_SpecializationInfo and C_SpecializationInfo.GetSpecialization then
+        local ok, idx = pcall(C_SpecializationInfo.GetSpecialization)
+        if ok and idx and idx > 0 then return idx end
     end
-    return 0
+    if GetSpecialization then
+        local ok, idx = pcall(GetSpecialization)
+        if ok and idx and idx > 0 then return idx end
+    end
+    return nil
+end
+
+-- 返回 specID, specName；拿不到返回 nil
+function CG.GetSpecInfo(specIndex)
+    local idx = specIndex or SpecGetIndex()
+    if not idx or idx <= 0 then return nil end
+    if C_SpecializationInfo and C_SpecializationInfo.GetSpecializationInfo then
+        local ok, id, name = pcall(C_SpecializationInfo.GetSpecializationInfo, idx)
+        if ok and id then return id, name end
+    end
+    if GetSpecializationInfo then
+        local ok, id, name = pcall(GetSpecializationInfo, idx)
+        if ok and id then return id, name end
+    end
+    return nil
+end
+
+-- 当前专精 ID（无专精 / API 不可用均返回 0）
+local function GetCurrentSpecID()
+    return CG.GetSpecInfo() or 0
 end
 CG.GetCurrentSpecID = GetCurrentSpecID
 

@@ -175,16 +175,14 @@ end
 local function DoRefresh()
     if not configFrame then return end
 
-    -- 当前专精名（⚠️ GetSpecializationInfo 第 1 个返回值是 specID，名字是第 2 个）
+    -- 当前专精名（专精 API 已迁到 C_SpecializationInfo，统一走主文件的 CG.GetSpecInfo，
+    -- 兼容 Forever 客户端没有全局 GetSpecialization/GetSpecializationInfo 的情况）
     local specName = L("SPEC_UNKNOWN")
-    local idx = GetSpecialization()
-    if idx and idx > 0 then
-        local ok, id, name = pcall(GetSpecializationInfo, idx)
-        if ok and name and name ~= "" then
-            specName = name
-        elseif ok and id then
-            specName = tostring(id)
-        end
+    local specID, name = CG.GetSpecInfo()
+    if name and name ~= "" then
+        specName = name
+    elseif specID then
+        specName = tostring(specID)
     end
     -- 头部信息行：当前职业 + 配置专精（存档槽位）
     configFrame.specText:SetText(
